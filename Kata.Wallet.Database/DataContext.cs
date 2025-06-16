@@ -15,7 +15,7 @@ public class DataContext : DbContext
         options.UseInMemoryDatabase("WalletDb");
     }
 
-    public DbSet<Domain.Wallet> Wallets { get; set; }
+    public virtual DbSet<Domain.Wallet> Wallets { get; set; }
     public DbSet<Transaction> Transactions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

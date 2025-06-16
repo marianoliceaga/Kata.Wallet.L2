@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using System.Threading.Tasks;
 
 namespace Kata.Wallet.UnitTests
 {
@@ -23,12 +24,6 @@ namespace Kata.Wallet.UnitTests
 
             Context = new DataContext(configuration);
 
-            Context.Wallets.AddRange(
-                new Domain.Wallet { UserDocument = "user1", Currency = Currency.USD, Balance = 100 },
-                new Domain.Wallet { UserDocument = "user1", Currency = Currency.EUR, Balance = 200 },
-                new Domain.Wallet { UserDocument = "user2", Currency = Currency.USD, Balance = 300 },
-                new Domain.Wallet { UserDocument = "user2", Currency = Currency.USD, Balance = 300 }
-            );
             Context.SaveChanges();
         }
 
@@ -65,18 +60,18 @@ namespace Kata.Wallet.UnitTests
             Context.Transactions.AddRange(
                 new Transaction
                 {
-                    WalletIncoming = new Domain.Wallet { Id = walletId },
-                    WalletOutgoing = new Domain.Wallet { Id = 2 }
+                    WalletIncoming = await Context.Wallets.FirstOrDefaultAsync(w => w.Id == walletId),
+                    WalletOutgoing = await Context.Wallets.FirstOrDefaultAsync(w => w.Id == 2)
                 },
                 new Transaction
                 {
-                    WalletIncoming = new Domain.Wallet { Id = 3 },
-                    WalletOutgoing = new Domain.Wallet { Id = walletId }
+                    WalletIncoming = await Context.Wallets.FirstOrDefaultAsync(w => w.Id == 3),
+                    WalletOutgoing = await Context.Wallets.FirstOrDefaultAsync(w => w.Id == walletId)
                 },
                 new Transaction
                 {
-                    WalletIncoming = new Domain.Wallet { Id = 4 },
-                    WalletOutgoing = new Domain.Wallet { Id = 5 }
+                    WalletIncoming = await Context.Wallets.FirstOrDefaultAsync(w => w.Id == 4),
+                    WalletOutgoing = await Context.Wallets.FirstOrDefaultAsync(w => w.Id == walletId)
                 }
             );
             Context.SaveChanges();
@@ -92,6 +87,8 @@ namespace Kata.Wallet.UnitTests
             {
                 Assert.True(t.WalletIncoming.Id == walletId || t.WalletOutgoing.Id == walletId);
             }
+
+            Context?.Dispose();
         }
 
         [Test]
@@ -123,10 +120,6 @@ namespace Kata.Wallet.UnitTests
         public void CreateTransfence_ThrowsIfWalletNotFound()
         {
             // Arrange
-            var wallet = new Domain.Wallet { Id = 1, Balance = 100m };
-            Context.Wallets.Add(wallet);
-            Context.SaveChanges();
-
             var service = new TransactionService(Context, _logger);
 
             // Act & Assert
@@ -140,19 +133,17 @@ namespace Kata.Wallet.UnitTests
         }
 
         [Test]
-        public void CreateTransfence_ThrowsIfInsufficientFunds()
+        public async Task CreateTransfence_ThrowsIfInsufficientFunds()
         {
             // Arrange
-            var walletFrom = new Domain.Wallet { Id = 1, Balance = 5m };
-            var walletTo = new Domain.Wallet { Id = 2, Balance = 0m };
-            Context.Wallets.AddRange(walletFrom, walletTo);
-            Context.SaveChanges();
+            var walletFrom = await Context.Wallets.FirstOrDefaultAsync(w => w.Id == 1);
+            var walletTo = await Context.Wallets.FirstOrDefaultAsync(w => w.Id == 2);
 
             var service = new TransactionService(Context, _logger);
     
             // Act & Assert
             var ex = Assert.ThrowsAsync<InvalidOperationException>(async () =>
-                await service.CreateTransference(walletFrom.Id, walletTo.Id, 10m));
+                await service.CreateTransference(walletFrom.Id, walletTo.Id, 1000m));
             Assert.That(ex!.Message, Does.Contain("Insufficient funds"));
         }
     }
